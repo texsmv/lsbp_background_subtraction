@@ -180,7 +180,7 @@ __global__ void cuda_step(float* d_B_int, int* d_B_lsbp, float* d_int, float* d_
   if(i < h & j < w){
 
     int count = 0;
-    for(int k = 0; k < S; k++){
+    for(int k = 0; k < S && count < threshold; k++){
       if(fabs(at2d(d_int, i, j, w) - at3d(d_B_int, i, j, k, w, S)) < at2d(d_R, i, j, w) && HammingDist(at2d(d_lbp, i, j, w), at3d(d_B_lsbp,i, j, k, w, S)) < HR ){
         count++;
       }
