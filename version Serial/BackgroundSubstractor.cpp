@@ -5,7 +5,7 @@ BackgroundSubstractor::BackgroundSubstractor(){
   vector<string> files = globVector("input/*");
   sort(files.begin(), files.end());
   for (int i = 0 ; i < files.size(); i++){
-    // cout<<files[i]<<endl;
+    cout<<files[i]<<endl;
     Frame f(files[i]);
     frames.push_back(f);
   }
@@ -62,6 +62,7 @@ void BackgroundSubstractor::init(){
   float** intensidad = frames[0].intensidad;
   float** SVD = svd(intensidad, h, w);
   int** lbp = lsbp(SVD, h, w);
+
   for(int i = 0; i < h; i++){
     for(int j = 0; j < w; j++){
       int i0 = clip(i, r, h - r - 1);
@@ -84,6 +85,7 @@ void BackgroundSubstractor::step(int pos){
   float** intensidad = frames[pos].intensidad;
   float** SVD = svd(intensidad, h, w);
   int** lbp = lsbp(SVD, h, w);
+
   bool** mask = new bool*[h];
   for(int i = 0; i < h; i++){
     mask[i] = new bool[w];
@@ -109,7 +111,7 @@ void BackgroundSubstractor::step(int pos){
   update_T(mask);
   update_models(mask, intensidad, lbp);
   cout<<pos<<endl;
-  imwrite("output/confe" + to_string(pos) + ".jpg" , frames[pos].mat);
+  imwrite("output/" + to_string(pos) + ".jpg" , frames[pos].mat);
 }
 
 

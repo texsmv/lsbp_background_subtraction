@@ -15,6 +15,7 @@ public:
   void update_T();
   void dmin();
   void update_models();
+
   void set_intensities(vector<float*>*);
   void set_frames(vector<Mat>*);
 
@@ -215,14 +216,14 @@ void BackgroundSubstractor::process_image(){
 
   h_int = frames_int->at(frame_pos);
   cuda_H2D<float>(h_int, d_int, h * w);
-  cudaDeviceSynchronize();
 
-  // printf("Size: %f \n", h_int[0]);
 
   cuda_svd(d_int, d_svd, h, w, block, grid);
+
   CHECK(cudaDeviceSynchronize());
 
   cuda_lsbp(d_svd, d_lbp, h, w, block, grid);
+
   cudaDeviceSynchronize();
   printf("    -   done\n" );
 }

@@ -363,7 +363,7 @@ __global__ void batched_svd_kernel(int h, int wi, float* d_int, float* d_svd){
   // if(id <= 33){
   //     printf("%d %d \n", h , w);
   // }
-  __syncthreads();
+  // __syncthreads();
 }
 
 void cuda_svd(float* d_int, float* d_svd, int h, int w, dim3 block, dim3 grid){

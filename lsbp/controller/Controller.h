@@ -42,8 +42,6 @@ void Controller::init(){
   }
 
 
-
-
   VC->erase_frames();
 
 

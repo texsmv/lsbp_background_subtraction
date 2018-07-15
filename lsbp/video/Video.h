@@ -22,7 +22,7 @@ private:
   unsigned int num_frames;
   unsigned int actual_frame;
   bool b_resize = false;
-
+  int cont = 0;
   friend class Controller;
 };
 
@@ -67,6 +67,9 @@ void Video::capture_batch(unsigned int batch_size){
       p_frame = &frame;
       // if(b_resize)
       resize(frame, frame, Size(500, 500));
+
+
+
       cvtColor(frame, frame, CV_BGR2GRAY);
       frames.push_back(frame);
 
@@ -82,6 +85,7 @@ void Video::capture_batch(unsigned int batch_size){
       }
       //
       frames_int.push_back(intensidad);
+      cont++;
 
     }
     height = p_frame->rows;
