@@ -93,11 +93,11 @@ __global__ void cuda_dmin(float* d_D, float* d_d, int h, int w, int S){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   if(i < h & j < w){
-    at2d(d_d, i, j, w) = 0;
+    float average = 0;
     for(int k = 0; k < S; k++){
-      at2d(d_d, i, j, w) += at3d(d_D, i, j, k, w, S);
+      average += at3d(d_D, i, j, k, w, S);
     }
-    at2d(d_d, i, j, w) /= S;
+    at2d(d_d, i, j, w) = average/S;
   }
 }
 
@@ -149,6 +149,11 @@ __global__ void cuda_update_models(float* d_B_int, int* d_B_lsbp, float* d_D, fl
         at3d(d_B_int, i, j, p, w, S) = at2d(d_int, i, j, w);
         at3d(d_B_lsbp, i, j, p, w, S) = at2d(d_lbp, i, j, w);
         at3d(d_D, i, j, p, w, S) = min;
+
+        float average = 0;
+        for(int k = 0; k < S; k++)
+          average += at3d(d_D, i, j, k, w, S);
+        at2d(d_d, i, j, w) = average/S;
       }
       if(random(states, i, j, h, w, 0, 100) < (1 / at2d(d_T, i, j, w))){
         int i0 = clip(i + random(states, i, j, h, w, -1, 2), 0, h - 1);
@@ -164,6 +169,11 @@ __global__ void cuda_update_models(float* d_B_int, int* d_B_lsbp, float* d_D, fl
         at3d(d_B_int, i0, j0, p, w, S) = at2d(d_int, i0, j0, w);
         at3d(d_B_lsbp, i0, j0, p, w, S) = at2d(d_lbp, i0, j0, w);
         at3d(d_D, i0, j0, p, w, S) = min;
+
+        float average = 0;
+        for(int k = 0; k < S; k++)
+          average += at3d(d_D, i0, j0, k, w, S);
+        at2d(d_d, i0, j0, w) = average/S;
       }
     }
 
