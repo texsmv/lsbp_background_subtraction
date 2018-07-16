@@ -259,9 +259,9 @@ void BackgroundSubstractor::step(){
 
   cuda_update_T<<<grid, block>>>(d_T, d_mask, d_d, h, w, s, Tinc, Tdec, Tlower, Tupper);
 
-  cuda_update_models<<<grid, block>>>(d_B_int, d_B_lsbp, d_D, d_R, d_T, d_int, d_lbp, d_mask, h, w, s, states);
+  cuda_update_models<<<grid, block>>>(d_B_int, d_B_lsbp, d_D, d_R, d_T, d_int, d_lbp, d_mask, d_d, h, w, s, states);
 
-  cuda_dmin<<<grid, block>>>(d_D, d_d, h, w, s);
+  //cuda_dmin<<<grid, block>>>(d_D, d_d, h, w, s);
 
   frame_pos++;
   cont++;
