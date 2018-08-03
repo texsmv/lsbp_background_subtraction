@@ -7,14 +7,49 @@
 #include <math.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <iostream>
+#include <libconfig.h++>
+
 
 #include "../structures.h"
 #include "../lbp/lbp.h"
 #include "../svd/svd.h"
+#include "../video/Video.h"
 
 using namespace std;
 using namespace cv;
+using namespace libconfig;
 
+float g_20_p(float total){
+  return total / 50.0;
+}
+
+
+template<class T>
+T min_v(T* v, int n){
+  T min = 0;
+  for(int i = 0; i < n; i++){
+    if(min > v[i]){
+      min = v[i];
+    }
+  }
+  return min;
+}
+template<class T>
+T max_v(T* v, int n){
+  T max = 0;
+  for(int i = 0; i < n; i++){
+    if(max < v[i]){
+      max = v[i];
+    }
+  }
+  return max;
+}
+
+float scaleBetween(float unscaledNum, float minAllowed, float maxAllowed, float min, float max) {
+  return (maxAllowed - minAllowed) * (unscaledNum - min) / (max - min) + minAllowed;
+}
 
 // clip
 __device__ float clip(float i, float a, float b){
@@ -40,18 +75,22 @@ __device__ int HammingDist(int x, int y)
 }
 
 
+
+
 // random numbers from curand states
 __device__ int random(curandState_t* states, int h, int w, int i, int j,int min, int max) {
   curandState localState = at2d(states, i, j, w);
 
   // generar número pseudoaleatorio
-  int ran = min + curand(&localState) % (max - min);;
+  int ran = min + (curand(&localState)) % (max - min);;
 
   //copiar state de regreso a memoria global
   at2d(states, i, j, w) = localState;
 
   //almacenar resultados
   // result[ind] = r;
+
+  // printf("%d\n", ran);
 
   return ran;
 }
@@ -71,7 +110,7 @@ __global__ void initialization_kernel(float* d_B_int, int* d_B_lsbp, float* d_in
   int r = S / 2;
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
+  if(i < h && j < w){
 
 
     int i0 = clip(i, r, h - r - 1);
@@ -92,7 +131,7 @@ __global__ void initialization_kernel(float* d_B_int, int* d_B_lsbp, float* d_in
 __global__ void cuda_dmin(float* d_D, float* d_d, int h, int w, int S){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
+  if(i < h && j < w){
     float average = 0;
     for(int k = 0; k < S; k++){
       average += at3d(d_D, i, j, k, w, S);
@@ -105,8 +144,8 @@ __global__ void cuda_dmin(float* d_D, float* d_d, int h, int w, int S){
 __global__ void cuda_update_R(float* d_R, float* d_d, int h, int w, int S, float Rscale, float Rlower, float Rlr){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
-
+  if(i < h && j < w){
+    // printf("%f  -  %f\n",at2d(d_R, i, j, w), at2d(d_d, i, j, w) * Rscale);
     if(at2d(d_R, i, j, w) > at2d(d_d, i, j, w) * Rscale)
       at2d(d_R, i, j, w) = (1 - Rlr) * at2d(d_R, i, j, w);
     else
@@ -119,9 +158,7 @@ __global__ void cuda_update_R(float* d_R, float* d_d, int h, int w, int S, float
 __global__ void cuda_update_T(float* d_T, bool* d_mask, float* d_d, int h, int w, int S, float Tinc, float Tdec, float Tlower, float Tupper){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
-
-
+  if(i < h && j < w){
     if(at2d(d_mask, i, j, w) == true){
       at2d(d_T, i, j, w) = at2d(d_T, i, j, w) + Tinc / at2d(d_d, i, j, w);
     }
@@ -136,9 +173,10 @@ __global__ void cuda_update_T(float* d_T, bool* d_mask, float* d_d, int h, int w
 __global__ void cuda_update_models(float* d_B_int, int* d_B_lsbp, float* d_D, float* d_R, float* d_T, float* d_int, int* d_lbp, bool* d_mask, float* d_d, int h, int w, int S, curandState_t* states){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
+  if(i < h && j < w){
     if(at2d(d_mask, i, j, w) == false){
-      if(random(states, i, j, h, w, 0, 100) < (1 / at2d(d_T, i, j, w))){
+      // printf("%d\n", random(states, i, j, h, w, 0, 100) );
+      if((random(states, i, j, h, w, 0, 100) / 100.0) < (1.0 / at2d(d_T, i, j, w))){
         int p = random(states, i, j, h, w, 0, S);
         int min = fabs(at3d(d_B_int, i, j, 0, w, S) - at2d(d_int, i, j, w));
         for(int k = 1; k < S; k++){
@@ -154,8 +192,9 @@ __global__ void cuda_update_models(float* d_B_int, int* d_B_lsbp, float* d_D, fl
         for(int k = 0; k < S; k++)
           average += at3d(d_D, i, j, k, w, S);
         at2d(d_d, i, j, w) = average/S;
+        // printf(" %f\n", average );
       }
-      if(random(states, i, j, h, w, 0, 100) < (1 / at2d(d_T, i, j, w))){
+      if((random(states, i, j, h, w, 0, 100) / 100.0) < (1.0 / at2d(d_T, i, j, w))){
         int i0 = clip(i + random(states, i, j, h, w, -1, 2), 0, h - 1);
         int j0 = clip(j + random(states, i, j, h, w, -1, 2), 0, w - 1);
         int p = random(states, i, j, h, w, 0, S);
@@ -187,11 +226,11 @@ __global__ void cuda_update_models(float* d_B_int, int* d_B_lsbp, float* d_D, fl
 __global__ void cuda_step(float* d_B_int, int* d_B_lsbp, float* d_int, float* d_svd, int* d_lbp, bool* d_mask, int h, int w, int S, int threshold, int HR, float* d_R){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if(i < h & j < w){
+  if(i < h && j < w){
 
     int count = 0;
     for(int k = 0; k < S && count < threshold; k++){
-      if(fabs(at2d(d_int, i, j, w) - at3d(d_B_int, i, j, k, w, S)) < at2d(d_R, i, j, w) && HammingDist(at2d(d_lbp, i, j, w), at3d(d_B_lsbp,i, j, k, w, S)) < HR ){
+      if( (fabs(at2d(d_int, i, j, w) - at3d(d_B_int, i, j, k, w, S)) < at2d(d_R, i, j, w)) && (HammingDist(at2d(d_lbp, i, j, w), at3d(d_B_lsbp,i, j, k, w, S)) < HR )){
         count++;
       }
     }

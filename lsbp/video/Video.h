@@ -17,6 +17,7 @@ private:
   string path;
   unsigned int height, width, r_height, r_width;
   vector<Mat> frames;
+  vector<Mat> real_frames;
   vector<float*> frames_int;
   VideoCapture* cap;
   unsigned int num_frames;
@@ -24,6 +25,7 @@ private:
   bool b_resize = false;
   int cont = 0;
   friend class Controller;
+  friend class BackgroundSubstractor;
 };
 
 
@@ -51,45 +53,47 @@ Video::~Video(){
 
 
 void Video::capture_batch(unsigned int batch_size){
-
   unsigned int l_frame = actual_frame + batch_size;
   // try{
-    Mat* p_frame;
-    for(; actual_frame < l_frame && actual_frame < num_frames; actual_frame++){
-      // printf("Frame %d \n", actual_frame);
+  Mat* p_frame;
 
-      Mat frame;
-      // grey = new Mat();
-      (*cap) >> frame;
-      // imwrite("../../data/input/" + to_string(actual_frame) + ".png", frame);
-      // Mat frame = imread("../../data/input/" + to_string(actual_frame) + ".png", 0);
+  for(; actual_frame < l_frame && actual_frame < num_frames; actual_frame++){
+    // printf("Frame %d \n", actual_frame);
 
-      p_frame = &frame;
-      // if(b_resize)
-      resize(frame, frame, Size(500, 500));
+    Mat frame;
+    // grey = new Mat();
+    (*cap) >> frame;
+    // imwrite("../../data/input/" + to_string(actual_frame) + ".png", frame);
+    // Mat frame = imread("../../data/input/" + to_string(actual_frame) + ".png", 0);
 
+    p_frame = &frame;
+    // if(b_resize)
 
+    resize(frame, frame, Size(r_width, r_height));
 
-      cvtColor(frame, frame, CV_BGR2GRAY);
-      frames.push_back(frame);
+    Mat color = frame.clone();
+    real_frames.push_back(color);
 
-      float* intensidad = new float[frame.rows * frame.cols];
-      //
-      // printf("%d %d \n", frame.rows, frame.cols);
-      uchar *ptrDst[frame.rows];
-      for(int i = 0; i < frame.rows; ++i) {
-        ptrDst[i] = frame.ptr<uchar>(i);
-        for(int j = 0; j < frame.cols; ++j) {
-          at2d(intensidad, i, j, frame.rows) = ptrDst[i][j];
-        }
+    cvtColor(frame, frame, CV_BGR2GRAY);
+    frames.push_back(frame);
+
+    float* intensidad = new float[frame.rows * frame.cols];
+    //
+    // printf("%d %d \n", frame.rows, frame.cols);
+    uchar *ptrDst[frame.rows];
+    for(int i = 0; i < frame.rows; ++i) {
+      ptrDst[i] = frame.ptr<uchar>(i);
+      for(int j = 0; j < frame.cols; ++j) {
+        at2d(intensidad, i, j, frame.cols) = ptrDst[i][j];
       }
-      //
-      frames_int.push_back(intensidad);
-      cont++;
-
     }
-    height = p_frame->rows;
-    width = p_frame->cols;
+    //
+    frames_int.push_back(intensidad);
+    cont++;
+
+  }
+  height = p_frame->rows;
+  width = p_frame->cols;
   // }
   // catch( cv::Exception& e ){
   //   cerr << e.msg << endl;
@@ -100,8 +104,10 @@ void Video::capture_batch(unsigned int batch_size){
 void Video::erase_frames(){
   for(int i = 0; i < frames.size(); i++){
     frames[i].release();
+    delete(frames_int[i]);
   }
   frames.clear();
+  real_frames.clear();
   frames_int.clear();
 }
 

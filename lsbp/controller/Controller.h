@@ -7,7 +7,7 @@ class Controller{
 public:
   Controller();
   ~Controller();
-  void init();
+  void init(unsigned int, unsigned int, string, string, unsigned int, unsigned int);
 private:
   BackgroundSubstractor* BS;
   Video* VC;
@@ -24,26 +24,20 @@ Controller::~Controller(){
   delete(BS);
 }
 
-void Controller::init(){
-  VC = new Video("data/videos/video1.mp4");
+void Controller::init(unsigned int height, unsigned int width, string nombre_input, string nombre_output, unsigned int batch_size, unsigned int n){
+  VC = new Video("data/video input/" + nombre_input);
 
-  BS = new BackgroundSubstractor();
-  BS->initialize(500, 500);
+  VC->set_size(height, width);
 
-  VC->capture_batch(300);
-  BS->set_intensities(&(VC->frames_int));
-  BS->set_frames(&(VC->frames));
-
-
-  BS->initialize_model();
-
-  for(int i = 0; i < 300; i++){
-    BS->step();
+  if(n != 0){
+    VC->num_frames = n;
   }
 
-
-  VC->erase_frames();
-
+  BS = new BackgroundSubstractor();
+  BS->initialize(nombre_output, height, width);
+  
+  BS->set_video(VC);
+  BS->process_video(batch_size);
 
 }
 
