@@ -19,6 +19,9 @@ private:
   vector<Mat> frames;
   vector<Mat> real_frames;
   vector<float*> frames_int;
+  vector<float*> frames_green;
+  vector<float*> frames_blue;
+  vector<float*> frames_red;
   VideoCapture* cap;
   unsigned int num_frames;
   unsigned int actual_frame;
@@ -72,23 +75,37 @@ void Video::capture_batch(unsigned int batch_size){
     resize(frame, frame, Size(r_width, r_height));
 
     Mat color = frame.clone();
+
     real_frames.push_back(color);
 
     cvtColor(frame, frame, CV_BGR2GRAY);
     frames.push_back(frame);
 
     float* intensidad = new float[frame.rows * frame.cols];
+    float* green = new float[frame.rows * frame.cols];
+    float* red = new float[frame.rows * frame.cols];
+    float* blue = new float[frame.rows * frame.cols];
     //
     // printf("%d %d \n", frame.rows, frame.cols);
     uchar *ptrDst[frame.rows];
+    Vec3b *ptrColor[frame.rows];
+
+
     for(int i = 0; i < frame.rows; ++i) {
       ptrDst[i] = frame.ptr<uchar>(i);
+      ptrColor[i] = color.ptr<Vec3b>(i);
       for(int j = 0; j < frame.cols; ++j) {
         at2d(intensidad, i, j, frame.cols) = ptrDst[i][j];
+        at2d(red, i, j, frame.cols) = ptrColor[i][j][0];
+        at2d(green, i, j, frame.cols) = ptrColor[i][j][1];
+        at2d(blue, i, j, frame.cols) = ptrColor[i][j][2];
       }
     }
     //
     frames_int.push_back(intensidad);
+    frames_red.push_back(red);
+    frames_blue.push_back(blue);
+    frames_green.push_back(green);
     cont++;
 
   }
@@ -105,10 +122,16 @@ void Video::erase_frames(){
   for(int i = 0; i < frames.size(); i++){
     frames[i].release();
     delete(frames_int[i]);
+    delete(frames_red[i]);
+    delete(frames_green[i]);
+    delete(frames_blue[i]);
   }
   frames.clear();
   real_frames.clear();
   frames_int.clear();
+  frames_red.clear();
+  frames_blue.clear();
+  frames_green.clear();
 }
 
 

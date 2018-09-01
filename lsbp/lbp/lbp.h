@@ -23,6 +23,7 @@ __device__ int lbp_pixel(float* mat, int h, int w, int i2, int j2, float tau){
   return sum;
 }
 
+
 // lsbp kernel
 __global__ void lsbp_kernel(float* d_mat, int* d_lbp, float tau, int h, int w){
   int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -32,6 +33,7 @@ __global__ void lsbp_kernel(float* d_mat, int* d_lbp, float tau, int h, int w){
   }
 
 }
+
 
 // function to call kernel
 void cuda_lsbp(float* d_mat, int* d_lbp, int h, int w, float tau, dim3 block, dim3 grid){
