@@ -22,6 +22,8 @@ private:
   vector<float*> frames_green;
   vector<float*> frames_blue;
   vector<float*> frames_red;
+  vector<float*> frames_cb;
+  vector<float*> frames_cr;
   VideoCapture* cap;
   unsigned int num_frames;
   unsigned int actual_frame;
@@ -76,6 +78,11 @@ void Video::capture_batch(unsigned int batch_size){
 
     Mat color = frame.clone();
 
+    Mat color_ycbcr = frame.clone();
+
+    cvtColor(color_ycbcr, color_ycbcr, CV_BGR2YCrCb);
+    // cvtColor(color_ycbcr, color_ycbcr, CV_BGR2HSV);
+
     real_frames.push_back(color);
 
     cvtColor(frame, frame, CV_BGR2GRAY);
@@ -85,20 +92,28 @@ void Video::capture_batch(unsigned int batch_size){
     float* green = new float[frame.rows * frame.cols];
     float* red = new float[frame.rows * frame.cols];
     float* blue = new float[frame.rows * frame.cols];
-    //
+    float* cb = new float[frame.rows * frame.cols];
+    float* cr = new float[frame.rows * frame.cols];
+
     // printf("%d %d \n", frame.rows, frame.cols);
     uchar *ptrDst[frame.rows];
     Vec3b *ptrColor[frame.rows];
+    Vec3b *ptrYCbCr[frame.rows];
 
 
     for(int i = 0; i < frame.rows; ++i) {
       ptrDst[i] = frame.ptr<uchar>(i);
       ptrColor[i] = color.ptr<Vec3b>(i);
+      ptrYCbCr[i] = color_ycbcr.ptr<Vec3b>(i);
       for(int j = 0; j < frame.cols; ++j) {
         at2d(intensidad, i, j, frame.cols) = ptrDst[i][j];
+
         at2d(red, i, j, frame.cols) = ptrColor[i][j][0];
         at2d(green, i, j, frame.cols) = ptrColor[i][j][1];
         at2d(blue, i, j, frame.cols) = ptrColor[i][j][2];
+
+        at2d(cr, i, j, frame.cols) = ptrYCbCr[i][j][1];
+        at2d(cb, i, j, frame.cols) = ptrYCbCr[i][j][2];
       }
     }
     //
@@ -106,6 +121,9 @@ void Video::capture_batch(unsigned int batch_size){
     frames_red.push_back(red);
     frames_blue.push_back(blue);
     frames_green.push_back(green);
+    frames_cb.push_back(cb);
+    frames_cr.push_back(cr);
+
     cont++;
 
   }
@@ -125,6 +143,8 @@ void Video::erase_frames(){
     delete(frames_red[i]);
     delete(frames_green[i]);
     delete(frames_blue[i]);
+    delete(frames_cb[i]);
+    delete(frames_cr[i]);
   }
   frames.clear();
   real_frames.clear();
@@ -132,6 +152,8 @@ void Video::erase_frames(){
   frames_red.clear();
   frames_blue.clear();
   frames_green.clear();
+  frames_cb.clear();
+  frames_cr.clear();
 }
 
 

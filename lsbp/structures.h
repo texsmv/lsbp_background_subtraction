@@ -41,4 +41,11 @@ void cuda_D2H(T* d_arr, T* h_arr, int n){
 }
 
 
+// template to copy array from device to device
+template <class T>
+void cuda_D2D(T* d_arr, T* d_arr2, int n){
+  size_t tam = n * sizeof(T);
+  CHECK(cudaMemcpy(d_arr2, d_arr, tam, cudaMemcpyDeviceToDevice));
+}
+
 #endif

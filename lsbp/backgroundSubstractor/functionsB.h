@@ -340,8 +340,8 @@ __global__ void cuda_mask_one_channel(float* d_B_int, float* d_int, bool* d_mask
 
     int int_count = 0;
     bool int_match;
-    // for(int k = 0; k < S && count < threshold; k++){
-    for(int k = 0; k < S; k++){
+    for(int k = 0; k < S && int_count < threshold; k++){
+    // for(int k = 0; k < S; k++){
       int_match = (fabs(at2d(d_int, i, j, w) - at3d(d_B_int, i, j, k, w, S)) < at2d(d_R, i, j, w));
       if(int_match){
         int_count++;
@@ -363,8 +363,8 @@ __global__ void cuda_mask_texture(int* d_B_lsbp, int* d_lbp, bool* d_mask, int h
 
     int lbp_count = 0;
     bool lbp_match;
-    // for(int k = 0; k < S && count < threshold; k++){
-    for(int k = 0; k < S; k++){
+    for(int k = 0; k < S && lbp_count < threshold; k++){
+    // for(int k = 0; k < S; k++){
       lbp_match = HammingDist(at2d(d_lbp, i, j, w), at3d(d_B_lsbp,i, j, k, w, S)) < HR ;
       if(lbp_match){
         lbp_count++;
@@ -392,11 +392,47 @@ __global__ void cuda_and_masks(bool* d_mask1, bool* d_mask2, int h, int w){
   }
 }
 
-__global__ void cuda_or_masks(bool* d_mask1, bool* d_mask2, bool* d_mask3, bool* d_res, int h, int w){
+__global__ void cuda_or_masks_3(bool* d_mask1, bool* d_mask2, bool* d_mask3, bool* d_res, int h, int w){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   if(i < h && j < w){
     if(at2d(d_mask1, i, j, w) || at2d(d_mask2, i, j, w) || at2d(d_mask3, i, j, w)){
+      at2d(d_res, i, j, w) = true;
+    }
+    else{
+      at2d(d_res, i, j, w) = false;
+    }
+  }
+}
+
+__global__ void cuda_or_masks_2(bool* d_mask1, bool* d_mask2, bool* d_res, int h, int w){
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if(i < h && j < w){
+    if(at2d(d_mask1, i, j, w) || at2d(d_mask2, i, j, w)){
+      at2d(d_res, i, j, w) = true;
+    }
+    else{
+      at2d(d_res, i, j, w) = false;
+    }
+  }
+}
+
+__global__ void cuda_copy(bool* d_mask1, bool* d_res, int h, int w){
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if(i < h && j < w){
+      at2d(d_res, i, j, w) = at2d(d_mask1, i, j, w);
+
+
+  }
+}
+
+__global__ void cuda_and_masks_2(bool* d_mask1, bool* d_mask2, bool* d_res, int h, int w){
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if(i < h && j < w){
+    if(at2d(d_mask1, i, j, w) && at2d(d_mask2, i, j, w)){
       at2d(d_res, i, j, w) = true;
     }
     else{

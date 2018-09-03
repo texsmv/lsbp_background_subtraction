@@ -22,8 +22,8 @@ public:
     for(int i = 0; i < h; i ++){
       for(int j = 0; j < w; j ++){
         at2d(h_d, i, j, w) = 0.1;
-        at2d(h_R, i, j, w) = 18;
-        at2d(h_T, i, j, w) = 0.05;
+        at2d(h_R, i, j, w) = 5;
+        at2d(h_T, i, j, w) = 10;
         at2d(h_mask, i, j, w) = false;
         for(int k = 0; k < s; k ++){
           at3d(h_B_int, i, j, k, w, s) = 1;
@@ -165,6 +165,7 @@ public:
   void set_video(Video*);
   void save_show();
   void read_config_file();
+  void manage_masks();
 
 
   // To manage video
@@ -178,7 +179,11 @@ public:
   Channel* red;
   Channel* green;
   Channel* blue;
+  Channel* cb;
+  Channel* cr;
   TextureChannel* textura;
+
+  int bool_operator;
 
   bool* h_global_mask;
   bool* d_global_mask;
@@ -186,6 +191,7 @@ public:
 
 
   Mat mask_frame;
+  Mat texture_frame;
 
 
   unsigned int batch_pos = 0;
@@ -222,11 +228,14 @@ public:
   //config options
   bool show_real;
   bool show_mask;
+  bool show_texture;
 
   bool svd;
   bool gray_scale = false;
-  bool rgb = true;
+  bool rgb = false;
   bool texture = false;
+  int texture_number;
+  bool ycbcr = true;
 
   bool save_real;
   bool save_mask;
@@ -379,6 +388,14 @@ void BackgroundSubstractor::read_config_file(){
   }
   printf("Show mask video: %d  \n ", show_mask);
 
+  try{
+    show_texture = cfg.lookup("show_texture");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Show mask video: %d  \n ", show_mask);
+
 
   try{
     save_real = cfg.lookup("save_real_video");
@@ -399,6 +416,54 @@ void BackgroundSubstractor::read_config_file(){
 
   try{
     svd = cfg.lookup("use_svd");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    gray_scale = cfg.lookup("gray");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    texture = cfg.lookup("texture");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    rgb = cfg.lookup("rgb");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    ycbcr = cfg.lookup("ycbcr");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    texture_number = cfg.lookup("texture_number");
+  }
+  catch(const SettingNotFoundException &nfex){
+    cerr << "No 'name' setting in configuration file." << endl;
+  }
+  printf("Use svd: %d  \n ", svd);
+
+  try{
+    bool_operator = cfg.lookup("bool_operator");
   }
   catch(const SettingNotFoundException &nfex){
     cerr << "No 'name' setting in configuration file." << endl;
@@ -433,36 +498,48 @@ void BackgroundSubstractor::initialize(string nombre, int h, int w){
     moveWindow("Real", 1200, 50);
   }
 
-  printf("Height : %d, Width : %d\n", h, w);
-
-
-
+  if(show_texture){
+    namedWindow("Textura", CV_WINDOW_AUTOSIZE);
+    moveWindow("Textura", 150, 100);
+  }
 
   if(show_mask || save_mask){
     mask_frame = Mat::zeros(h, w, CV_8UC3);
   }
 
+  if(show_texture){
+    texture_frame = Mat::zeros(h, w, CV_8UC3);
+  }
+
+  printf("Height : %d, Width : %d\n", h, w);
 
   this->nombre = nombre;
   this->h = h;
   this->w = w;
+
 
   block = dim3(16, 16, 1);
   grid = dim3(ceil(h / float(block.x)), ceil(w / float(block.y)));
 
   printf("Block dimension: %d - %d - %d \n", block.x, block.y, block.z);
   printf("Grid dimension: %d - %d - %d \n", grid.x, grid.y, grid.z);
+  d_global_mask = cuda_array<bool>(h * w);
+  h_global_mask = new bool[h * w];
 
   if(rgb){
     green = new Channel(h, w, s);
     red = new Channel(h, w, s);
     blue = new Channel(h, w, s);
 
-    d_global_mask = cuda_array<bool>(h * w);
-    h_global_mask = new bool[h * w];
   }
 
-  if(gray_scale){
+  if(ycbcr){
+    cb = new Channel(h, w, s);
+    cr = new Channel(h, w, s);
+
+  }
+
+  if(gray_scale || texture){
     gray = new Channel(h, w, s);
   }
   if(texture){
@@ -477,13 +554,17 @@ void BackgroundSubstractor::initialize(string nombre, int h, int w){
   printf("Initializing curand states\n");
   init_randoms<<<grid, block>>>(time(0), states, h, w);
 
-  if(gray_scale){
+  if(gray_scale || texture){
     cuda_dmin<<<grid, block>>>(gray->d_D, gray->d_d, h, w, s);
   }
   if(rgb){
     cuda_dmin<<<grid, block>>>(red->d_D, red->d_d, h, w, s);
     cuda_dmin<<<grid, block>>>(green->d_D, green->d_d, h, w, s);
     cuda_dmin<<<grid, block>>>(blue->d_D, blue->d_d, h, w, s);
+  }
+  if(ycbcr){
+    cuda_dmin<<<grid, block>>>(cb->d_D, cb->d_d, h, w, s);
+    cuda_dmin<<<grid, block>>>(cr->d_D, cr->d_d, h, w, s);
   }
 
   cudaDeviceSynchronize();
@@ -497,7 +578,7 @@ void BackgroundSubstractor::set_video(Video* vid){
 }
 
 void BackgroundSubstractor::process_image(){
-  if(gray_scale){
+  if(gray_scale || texture){
     gray->h_int = current_video->frames_int.at(batch_pos);
     cuda_H2D<float>(gray->h_int, gray->d_int, h * w);
   }
@@ -512,7 +593,15 @@ void BackgroundSubstractor::process_image(){
     cuda_H2D<float>(blue->h_int, blue->d_int, h * w);
   }
 
-  if(texture){
+  if(ycbcr){
+    cb->h_int = current_video->frames_cb.at(batch_pos);
+    cuda_H2D<float>(cb->h_int, cb->d_int, h * w);
+
+    cr->h_int = current_video->frames_cr.at(batch_pos);
+    cuda_H2D<float>(cr->h_int, cr->d_int, h * w);
+  }
+
+  if(texture && svd){
     cuda_svd(gray->d_int, textura->d_svd, h, w, block, grid);
   }
 
@@ -521,12 +610,103 @@ void BackgroundSubstractor::process_image(){
 
   if(texture){
     if (svd)
-    cuda_lsbp(textura->d_svd, textura->d_lbp, h, w, lbp_threshold, block, grid);
+    cuda_texture(textura->d_svd, textura->d_lbp, h, w, lbp_threshold, block, grid, texture_number);
     else
-    cuda_lsbp(gray->d_int, textura->d_lbp, h, w, lbp_threshold, block, grid);
+    cuda_texture(gray->d_int, textura->d_lbp, h, w, lbp_threshold, block, grid, texture_number);
   }
   CHECK(cudaDeviceSynchronize());
 
+
+}
+
+void BackgroundSubstractor::manage_masks(){
+  // ----------- getting masks from models -------------------------
+
+  if(gray_scale){
+    cuda_mask_one_channel<<<grid, block>>>(gray->d_B_int, gray->d_int, gray->d_mask, h, w, s, threshold, gray->d_R);
+  }
+
+  if(texture){
+    cuda_mask_texture<<<grid, block>>>(textura->d_B_lsbp, textura->d_lbp, textura->d_mask, h, w, s, threshold, HR);
+  }
+
+  if(rgb){
+    cuda_mask_one_channel<<<grid, block>>>(green->d_B_int, green->d_int, green->d_mask, h, w, s, threshold, green->d_R);
+    cuda_mask_one_channel<<<grid, block>>>(red->d_B_int, red->d_int, red->d_mask, h, w, s, threshold, red->d_R);
+    cuda_mask_one_channel<<<grid, block>>>(blue->d_B_int, blue->d_int, blue->d_mask, h, w, s, threshold, blue->d_R);
+  }
+
+  if(ycbcr){
+    cuda_mask_one_channel<<<grid, block>>>(cb->d_B_int, cb->d_int, cb->d_mask, h, w, s, threshold, cb->d_R);
+    cuda_mask_one_channel<<<grid, block>>>(cr->d_B_int, cr->d_int, cr->d_mask, h, w, s, threshold, cr->d_R);
+  }
+
+  cudaDeviceSynchronize();
+  // ----------------------------------------------------------------
+
+  // ---------------mixing masks------------------------------
+
+  bool b_and = (1 == bool_operator);
+
+  if(gray_scale && texture){
+    cudaDeviceSynchronize();
+    if(b_and)
+      cuda_and_masks_2<<<grid, block>>>(textura->d_mask, gray->d_mask, d_global_mask, h, w);
+    else
+      cuda_or_masks_2<<<grid, block>>>(textura->d_mask, gray->d_mask, d_global_mask, h, w);
+  }
+  else if(rgb && texture){
+    cuda_or_masks_3<<<grid, block>>>(red->d_mask, green->d_mask, blue->d_mask, d_global_mask, h, w);
+    cudaDeviceSynchronize();
+    if(b_and)
+      cuda_and_masks_2<<<grid, block>>>(textura->d_mask, d_global_mask, d_global_mask, h, w);
+    else
+      cuda_or_masks_2<<<grid, block>>>(textura->d_mask, d_global_mask, d_global_mask, h, w);
+  }
+  else if(ycbcr && texture){
+    cuda_or_masks_2<<<grid, block>>>(cb->d_mask, cr->d_mask, d_global_mask, h, w);
+    cudaDeviceSynchronize();
+    if(b_and)
+      cuda_and_masks_2<<<grid, block>>>(textura->d_mask, d_global_mask, d_global_mask, h, w);
+    else
+      cuda_or_masks_2<<<grid, block>>>(textura->d_mask, d_global_mask, d_global_mask, h, w);
+  }
+
+  else if(rgb){
+    cudaDeviceSynchronize();
+    cuda_or_masks_3<<<grid, block>>>(red->d_mask, green->d_mask, blue->d_mask, d_global_mask, h, w);
+  }
+
+  else if(ycbcr){
+    cudaDeviceSynchronize();
+    cuda_or_masks_2<<<grid, block>>>(cb->d_mask, cr->d_mask, d_global_mask, h, w);
+  }
+
+  else if(texture){
+    cudaDeviceSynchronize();
+    cuda_D2D<bool>(textura->d_mask, d_global_mask, h * w);
+  }
+  else if(gray_scale){
+    cudaDeviceSynchronize();
+    cuda_D2D<bool>(gray->d_mask, d_global_mask, h * w);
+  }
+
+  // ------------------------------------------------------------------------
+
+
+  cudaDeviceSynchronize();
+
+  if(show_mask || save_mask){
+
+    cuda_D2H<bool>(d_global_mask, h_global_mask, h * w);
+    CHECK(cudaDeviceSynchronize());
+
+
+  }
+
+  if(show_texture){
+    cuda_D2H<int>(textura->d_lbp, textura->h_lbp, h * w);
+  }
 
 }
 
@@ -548,29 +728,7 @@ void BackgroundSubstractor::scale_lbp(int* h_lbp){
   }
 }
 
-// void BackgroundSubstractor::scale_r(){
-//   float min = 0;
-//   float max = 255;
-//   for(int i = 0; i < (h * w); i ++){
-//     h_R[i] = int(scaleBetween(h_R[i], 0, 255, min, max));
-//   }
-// }
-//
-// void BackgroundSubstractor::scale_t(){
-//   float min = T_lower;
-//   float max = T_upper;
-//   for(int i = 0; i < (h * w); i ++){
-//     h_T[i] = int(scaleBetween(h_T[i], 0, 255, min, max));
-//   }
-// }
-//
-// void BackgroundSubstractor::scale_d(){
-//   float min = min_v<float>(h_d, h * w);
-//   float max = max_v<float>(h_d, h * w);
-//   for(int i = 0; i < (h * w); i ++){
-//     h_d[i] = int(scaleBetween(h_d[i], 0, 255, min, max));
-//   }
-// }
+
 
 void BackgroundSubstractor::process_video(unsigned int batch_size){
   bool init = true;
@@ -629,10 +787,15 @@ void BackgroundSubstractor::initialize_model(){
   else if(gray_scale){
     initialization_kernel_gray<<<grid, block>>>(gray->d_B_int, gray->d_int, h, w, s, states);
   }
-  else if(rgb){
+  if(rgb){
     initialization_kernel_gray<<<grid, block>>>(red->d_B_int, red->d_int, h, w, s, states);
     initialization_kernel_gray<<<grid, block>>>(green->d_B_int, green->d_int, h, w, s, states);
     initialization_kernel_gray<<<grid, block>>>(blue->d_B_int, blue->d_int, h, w, s, states);
+  }
+  else if(ycbcr){
+    initialization_kernel_gray<<<grid, block>>>(cb->d_B_int, cb->d_int, h, w, s, states);
+    initialization_kernel_gray<<<grid, block>>>(cr->d_B_int, cr->d_int, h, w, s, states);
+
   }
   printf("--end-- \n");
 }
@@ -641,41 +804,7 @@ void BackgroundSubstractor::step(){
 
   process_image();
 
-  if(gray_scale){
-    // cuda_step<<<grid, block>>>(gray->d_B_int, textura->d_B_lsbp, gray->d_int, textura->d_svd, textura->d_lbp, gray->d_mask, h, w, s, threshold, HR, gray->d_R);
-    cuda_mask_one_channel<<<grid, block>>>(gray->d_B_int, gray->d_int, gray->d_mask, h, w, s, threshold, gray->d_R);
-  }
-
-  if(rgb){
-    cuda_mask_one_channel<<<grid, block>>>(red->d_B_int, red->d_int, red->d_mask, h, w, s, threshold, red->d_R);
-    cuda_mask_one_channel<<<grid, block>>>(green->d_B_int, green->d_int, green->d_mask, h, w, s, threshold, green->d_R);
-    cuda_mask_one_channel<<<grid, block>>>(blue->d_B_int, blue->d_int, blue->d_mask, h, w, s, threshold, blue->d_R);
-  }
-
-  if(texture){
-    cuda_mask_texture<<<grid, block>>>(textura->d_B_lsbp, textura->d_lbp, textura->d_mask, h, w, s, threshold, HR);
-  }
-
-  if(gray_scale && texture){
-    cuda_and_masks<<<grid, block>>>(textura->d_mask, gray->d_mask, h, w);
-  }
-
-  if(rgb){
-    cuda_or_masks<<<grid, block>>>(red->d_mask, green->d_mask, blue->d_mask, d_global_mask, h, w);
-  }
-
-  cudaDeviceSynchronize();
-
-  if(show_mask || save_mask){
-    if(gray_scale || texture){
-      cuda_D2H<bool>(gray->d_mask, gray->h_mask, h * w);
-    }
-    if(rgb){
-      cuda_D2H<bool>(d_global_mask, h_global_mask, h * w);
-
-    }
-    // cuda_D2H<bool>(textura->d_mask, textura->h_mask, h * w);
-  }
+  manage_masks();
 
   if(gray_scale || texture){
     cuda_update_R<<<grid, block>>>(gray->d_R, gray->d_d, h, w, s, R_scale, R_lower, R_inc_dec);
@@ -687,10 +816,18 @@ void BackgroundSubstractor::step(){
     cuda_update_T<<<grid, block>>>(green->d_T, green->d_mask, green->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
 
     cuda_update_R<<<grid, block>>>(red->d_R, red->d_d, h, w, s, R_scale, R_lower, R_inc_dec);
-    cuda_update_T<<<grid, block>>>(red->d_T, green->d_mask, red->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
+    cuda_update_T<<<grid, block>>>(red->d_T, red->d_mask, red->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
 
     cuda_update_R<<<grid, block>>>(blue->d_R, blue->d_d, h, w, s, R_scale, R_lower, R_inc_dec);
-    cuda_update_T<<<grid, block>>>(blue->d_T, green->d_mask, blue->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
+    cuda_update_T<<<grid, block>>>(blue->d_T, blue->d_mask, blue->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
+  }
+
+  if(ycbcr){
+    cuda_update_R<<<grid, block>>>(cb->d_R, cb->d_d, h, w, s, R_scale, R_lower, R_inc_dec);
+    cuda_update_T<<<grid, block>>>(cb->d_T, cb->d_mask, cb->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
+
+    cuda_update_R<<<grid, block>>>(cr->d_R, cr->d_d, h, w, s, R_scale, R_lower, R_inc_dec);
+    cuda_update_T<<<grid, block>>>(cr->d_T, cr->d_mask, cr->d_d, h, w, s, T_inc, T_dec, T_lower, T_upper);
   }
 
 
@@ -700,6 +837,11 @@ void BackgroundSubstractor::step(){
     cuda_update_models_gray<<<grid, block>>>(green->d_B_int, green->d_D, green->d_R, green->d_T, green->d_int, green->d_mask, green->d_d, h, w, s, states);
     cuda_update_models_gray<<<grid, block>>>(red->d_B_int, red->d_D, red->d_R, red->d_T, red->d_int, red->d_mask, red->d_d, h, w, s, states);
     cuda_update_models_gray<<<grid, block>>>(blue->d_B_int, blue->d_D, blue->d_R, blue->d_T, blue->d_int, blue->d_mask, blue->d_d, h, w, s, states);
+  }
+
+  if(ycbcr){
+    cuda_update_models_gray<<<grid, block>>>(cb->d_B_int, cb->d_D, cb->d_R, cb->d_T, cb->d_int, cb->d_mask, cb->d_d, h, w, s, states);
+    cuda_update_models_gray<<<grid, block>>>(cr->d_B_int, cr->d_D, cr->d_R, cr->d_T, cr->d_int, cr->d_mask, cr->d_d, h, w, s, states);
   }
 
   if(gray_scale){
@@ -721,33 +863,39 @@ void BackgroundSubstractor::save_show(){
 
 
   Vec3b **ptrMask;
+  Vec3b **ptrText;
 
   if (save_mask || show_mask){
     ptrMask = new Vec3b*[h];
     for(int i = 0; i < h; ++i) {
       ptrMask[i] = mask_frame.ptr<Vec3b>(i);
       for(int j = 0; j < w; ++j) {
-        if(gray_scale || texture){
-          if(at2d(gray->h_mask, i, j, w) == true){
-            ptrMask[i][j] = Vec3b(255, 255, 255);
-          }
-          else{
-            ptrMask[i][j] = Vec3b(0, 0, 0);
-          }
 
+
+        if(at2d(h_global_mask, i, j, w) == true){
+          ptrMask[i][j] = Vec3b(255, 255, 255);
+        }
+        else{
+          ptrMask[i][j] = Vec3b(0, 0, 0);
         }
 
-        if(rgb){
-          if(at2d(h_global_mask, i, j, w) == true){
-            ptrMask[i][j] = Vec3b(255, 255, 255);
-          }
-          else{
-            ptrMask[i][j] = Vec3b(0, 0, 0);
-          }
-        }
       }
     }
   }
+
+  if (show_texture){
+
+    ptrText = new Vec3b*[h];
+    for(int i = 0; i < h; ++i) {
+      ptrText[i] = texture_frame.ptr<Vec3b>(i);
+      for(int j = 0; j < w; ++j) {
+        int d = at2d(textura->h_lbp, i, j, w);
+        ptrText[i][j] = Vec3b(d, d, d);
+      }
+    }
+  }
+
+
 
 
   if(save_mask)
@@ -761,6 +909,9 @@ void BackgroundSubstractor::save_show(){
   }
   if(show_mask){
     imshow("Mascara", mask_frame);
+  }
+  if(show_texture){
+    imshow("Textura", texture_frame);
   }
 
   cv::waitKey(1);
