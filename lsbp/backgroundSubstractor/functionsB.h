@@ -11,6 +11,11 @@
 #include <iostream>
 #include <libconfig.h++>
 #include <vector>
+#include <thrust/device_vector.h>
+#include <thrust/generate.h>
+#include <thrust/copy.h>
+#include <thrust/reduce.h>
+
 
 
 #include "../structures.h"
@@ -455,6 +460,18 @@ __global__ void printVi(int* v, int h, int w){
   if(i < h & j < w){
     printf("%d ",v[i * w + j] );
   }
+}
+
+float calc_ratio(bool* h_mask, int h, int w){
+  // int n_back_p = thrust::reduce(thrust::host, h_mask, h_mask + (h * w));
+  int n_back_p = 0;
+  for (size_t i = 0; i < (h * w); i++) {
+    if (h_mask[i])
+      n_back_p ++;
+  }
+
+  return (float) n_back_p / (float)(h * w);
+  // return (float) n_back_p ;
 }
 
 #endif

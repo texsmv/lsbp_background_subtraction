@@ -42,7 +42,8 @@ Video::Video(){
 
 Video::Video(string path){
   this->path = path;
-  cap = new VideoCapture(path);
+  cap = new VideoCapture(0);
+  // cap = new VideoCapture(path);
   if(!cap->isOpened())
     CV_Error(CV_StsError, "Can not open Video file");
   num_frames = cap->get(CV_CAP_PROP_FRAME_COUNT);

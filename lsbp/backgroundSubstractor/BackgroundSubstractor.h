@@ -694,6 +694,7 @@ void BackgroundSubstractor::manage_masks(){
   // ------------------------------------------------------------------------
 
 
+
   cudaDeviceSynchronize();
 
   if(show_mask || save_mask){
@@ -707,6 +708,8 @@ void BackgroundSubstractor::manage_masks(){
   if(show_texture){
     cuda_D2H<int>(textura->d_lbp, textura->h_lbp, h * w);
   }
+
+
 
 }
 
@@ -913,6 +916,13 @@ void BackgroundSubstractor::save_show(){
   if(show_texture){
     imshow("Textura", texture_frame);
   }
+
+  float ratio = calc_ratio(h_global_mask, h, w);
+  cout<<"Ratio : "<<ratio<<endl;
+  if(ratio >= 0.001){
+    cout<<"ALARMA!!!"<<endl;
+  }
+
 
   cv::waitKey(1);
 }
