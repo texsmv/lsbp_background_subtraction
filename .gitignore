@@ -1,5 +1,5 @@
 /data/video output/*
 !/data/video output/read.txt
-/data/video input/*
-!/data/video input/read.txt
+/data/video_input/*
+!/data/video_input/read.txt
 exe
