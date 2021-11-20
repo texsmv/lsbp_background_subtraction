@@ -22,8 +22,8 @@ using namespace cv;
 void video_to_images_resize(string path, int n, int h, int w){
 
   VideoCapture* cap = new VideoCapture(path);
-  if(!cap->isOpened())
-    CV_Error(CV_StsError, "Can not open Video file");
+  // if(!cap->isOpened())
+  //   CV_Error(cv::StsError, "Can not open Video file");
   int num_frames = cap->get(CV_CAP_PROP_FRAME_COUNT);
   if(n != 0){
     num_frames = n;
@@ -45,8 +45,8 @@ void video_to_images_resize(string path, int n, int h, int w){
 void video_to_images(string path, int n){
 
   VideoCapture* cap = new VideoCapture(path);
-  if(!cap->isOpened())
-    CV_Error(CV_StsError, "Can not open Video file");
+  // if(!cap->isOpened())
+  //   CV_Error(cv::StsError, "Can not open Video file");
   int num_frames = cap->get(CV_CAP_PROP_FRAME_COUNT);
   if(n != 0){
     num_frames = n;

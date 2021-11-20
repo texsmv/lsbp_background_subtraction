@@ -42,11 +42,13 @@ Video::Video(){
 
 Video::Video(string path){
   this->path = path;
-  cap = new VideoCapture(0);
-  // cap = new VideoCapture(path);
-  if(!cap->isOpened())
-    CV_Error(CV_StsError, "Can not open Video file");
-  num_frames = cap->get(CV_CAP_PROP_FRAME_COUNT);
+  // cap = new VideoCapture(0);
+  cap = new VideoCapture(path);
+  if(!cap->isOpened()){
+    printf("Error opening video stream or file\n");
+  }
+  //   CV_Error(cv::StsError, "Can not open Video file");
+  num_frames = cap->get(cv::CAP_PROP_FRAME_COUNT);
   actual_frame = 0;
 }
 
@@ -81,12 +83,12 @@ void Video::capture_batch(unsigned int batch_size){
 
     Mat color_ycbcr = frame.clone();
 
-    cvtColor(color_ycbcr, color_ycbcr, CV_BGR2YCrCb);
+    cvtColor(color_ycbcr, color_ycbcr, cv::COLOR_BGR2YCrCb);
     // cvtColor(color_ycbcr, color_ycbcr, CV_BGR2HSV);
 
     real_frames.push_back(color);
 
-    cvtColor(frame, frame, CV_BGR2GRAY);
+    cvtColor(frame, frame, cv::COLOR_BGR2GRAY);
     frames.push_back(frame);
 
     float* intensidad = new float[frame.rows * frame.cols];

@@ -489,17 +489,17 @@ void BackgroundSubstractor::initialize(string nombre, int h, int w){
 
 
   if(show_mask){
-    namedWindow("Mascara", CV_WINDOW_AUTOSIZE);
+    namedWindow("Mascara", cv::WINDOW_AUTOSIZE);
     moveWindow("Mascara", 600, 700);
   }
 
   if(show_real){
-    namedWindow("Real", CV_WINDOW_AUTOSIZE);
+    namedWindow("Real", cv::WINDOW_AUTOSIZE);
     moveWindow("Real", 1200, 50);
   }
 
   if(show_texture){
-    namedWindow("Textura", CV_WINDOW_AUTOSIZE);
+    namedWindow("Textura", cv::WINDOW_AUTOSIZE);
     moveWindow("Textura", 150, 100);
   }
 
@@ -575,6 +575,7 @@ void BackgroundSubstractor::initialize(string nombre, int h, int w){
 
 void BackgroundSubstractor::set_video(Video* vid){
   current_video = vid;
+  printf("video set\n");
 }
 
 void BackgroundSubstractor::process_image(){
@@ -776,12 +777,11 @@ void BackgroundSubstractor::process_video(unsigned int batch_size){
 void BackgroundSubstractor::initialize_model(){
   printf("--Initializing model-- \n");
   if(save_mask)
-    out_video_mask = new VideoWriter("data/video output/" + nombre + "_mask.avi", CV_FOURCC('M','J','P','G'), 30, Size(w, h));
+    out_video_mask = new VideoWriter("data/video output/" + nombre + "_mask.avi", cv::VideoWriter::fourcc('M','J','P','G'), 30, Size(w, h));
   if(save_real)
-    out_video_real = new VideoWriter("data/video output/" + nombre + "_real.avi", CV_FOURCC('M','J','P','G'), 30, Size(w, h));
+    out_video_real = new VideoWriter("data/video output/" + nombre + "_real.avi", cv::VideoWriter::fourcc('M','J','P','G'), 30, Size(w, h));
 
   process_image();
-  printf("--!-- \n");
   frame_pos = 0;
 
   if(texture){
@@ -800,7 +800,6 @@ void BackgroundSubstractor::initialize_model(){
     initialization_kernel_gray<<<grid, block>>>(cr->d_B_int, cr->d_int, h, w, s, states);
 
   }
-  printf("--end-- \n");
 }
 
 void BackgroundSubstractor::step(){

@@ -26,7 +26,7 @@ It saves a vector of frames into jpg images into the outputDir as 1.jpg,2.jpg et
 */
 void save_frames(vector<Mat>& frames, const string& outputDir){
   vector<int> compression_params;
-  compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+  compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
 	compression_params.push_back(100);
   int frameNumber;
   vector<Mat>::iterator frame;
